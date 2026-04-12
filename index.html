@@ -24,25 +24,14 @@ function onScanSuccess(decodedText, decodedResult) {
 
     alert("Hasil scan: " + decodedText);
 
-    fetch("https://https://script.google.com/macros/s/AKfycbzuqB4V7NpFaFz9l2Av9kAx5_HISrj7xBkVh-PXcL2XoM0AQlinOtbKWJ-RLrYrBZDDhQ/exec", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/x-www-form-urlencoded"
-  },
-  body: "action=saveAttendance"
-        + "&qrText=" + encodeURIComponent(decodedText)
-        + "&guru=" + encodeURIComponent(document.getElementById("guru").value)
-})
-.then(response => response.text())
-.then(result => {
-  console.log("Respon:", result);
-  alert("Data berhasil dikirim ke Google Sheets");
-})
-.catch(error => {
-  console.error("Error:", error);
-  alert("Gagal kirim ke Google Sheets");
-});
+    const url = "https://script.google.com/macros/s/AKfycbzuqB4V7NpFaFz9l2Av9kAx5_HISrj7xBkVh-PXcL2XoM0AQlinOtbKWJ-RLrYrBZDDhQ/exec";
 
+const params =
+  "?action=saveAttendance" +
+  "&qrText=" + encodeURIComponent(decodedText) +
+  "&guru=" + encodeURIComponent(document.getElementById("guru").value);
+
+window.open(url + params, "_blank");
     setTimeout(() => {
         lastScan = "";
     }, 3000);
