@@ -22,14 +22,9 @@ function onScanSuccess(decodedText, decodedResult) {
     fetch("https://script.google.com/macros/s/AKfycbxIMBjYp3VReOD-KERcDhbOf3DzbPmSzHTN_6q60Fg2SnJMMYmFJwMix5sy4weOqWA/exec", {
         method: "POST",
         headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-            action: "saveAttendance",
-            qrText: decodedText,
-            source: "GitHub Scanner"
-        })
-    })
+            "Content-Type": "application/x-www-form-urlencoded"
+},
+body: "action=saveAttendance&qrText=" + encodeURIComponent(decodedText)    })
     .then(response => response.text())
     .then(result => {
         console.log("Respon:", result);
