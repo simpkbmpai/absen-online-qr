@@ -11,11 +11,38 @@
 <div id="reader" style="width:300px;"></div>
 
 <script>
-function onScanSuccess(decodedText, decodedResult) {
-    alert("Hasil scan: " + decodedText);
-    console.log(decodedText);
-}
+let lastScan = "";
 
+function onScanSuccess(decodedText, decodedResult) {
+    if (decodedText === lastScan) return;
+    lastScan = decodedText;
+
+    alert("Hasil scan: " + decodedText);
+
+    fetch("https://script.google.com/macros/s/AKfycbxIMBjYp3VReOD-KERcDhbOf3DzbPmSzHTN_6q60Fg2SnJMMYmFJwMix5sy4weOqWA/exec", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            qrText: decodedText,
+            source: "GitHub Scanner"
+        })
+    })
+    .then(response => response.text())
+    .then(result => {
+        console.log("Respon:", result);
+        alert("Data berhasil dikirim ke Google Sheets");
+    })
+    .catch(error => {
+        console.error("Error:", error);
+        alert("Gagal kirim ke Google Sheets");
+    });
+
+    setTimeout(() => {
+        lastScan = "";
+    }, 3000);
+}
 let scanner = new Html5QrcodeScanner(
     "reader",
     { fps: 10, qrbox: 250 }
