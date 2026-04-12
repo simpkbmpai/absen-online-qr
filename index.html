@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <style>
+    :root{--navy:#123a63;--blue:#e9f2fb;--green:#dff0d8;--red:#f8d7da;--orange:#fff3cd;--border:#dbe3eb;--text:#17324d}
+    *{box-sizing:border-box} body{font-family:Arial,sans-serif;margin:0;background:#f5f7fb;color:var(--text)}
+    .wrap{max-width:820px;margin:0 auto;padding:16px}.hero{background:linear-gradient(135deg,var(--navy),#1d5b91);color:#fff;padding:18px;border-radius:18px;margin-bottom:14px}
+    .hero h1{font-size:22px;margin:0 0 6px}.hero p{margin:4px 0 0;opacity:.95}.card{background:#fff;border:1px solid var(--border);border-radius:18px;padding:16px;margin-bottom:14px;box-shadow:0 4px 16px rgba(18,58,99,.06)}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}label{display:block;font-size:12px;font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em}
+    input,select,textarea,button{width:100%;font:inherit;border-radius:12px}input,select,textarea{border:1px solid #cfd9e2;padding:12px;background:#fff}
+    textarea{min-height:82px;resize:vertical}button{border:none;padding:13px 14px;font-weight:700;cursor:pointer}.btn-primary{background:var(--navy);color:#fff}.btn-light{background:var(--blue);color:var(--navy)}.btn-success{background:#198754;color:#fff}.btn-muted{background:#eef3f8;color:#244766}
+    .row{display:flex;gap:10px;flex-wrap:wrap}.row > *{flex:1}.status{padding:12px 14px;border-radius:14px;font-weight:700;margin-top:10px}.ok{background:var(--green);color:#14532d}.err{background:var(--red);color:#842029}.warn{background:var(--orange);color:#7c5b00}.hidden{display:none}.small{font-size:12px;color:#5f7388}
+    .inline-help{margin-top:8px;padding:10px 12px;background:#f8fbff;border:1px solid #e2ebf5;border-radius:12px}.preview{width:100%;max-height:280px;object-fit:contain;border:1px dashed #c4d4e5;border-radius:14px;background:#fafcff;padding:8px}.recent-item{padding:10px 0;border-bottom:1px solid #eef2f6}.recent-item:last-child{border-bottom:none}.pill{display:inline-block;background:#eef4fb;border:1px solid #d9e7f6;padding:6px 10px;border-radius:999px;font-size:12px;margin:4px 6px 0 0}
+    @media (max-width:600px){.grid{grid-template-columns:1fr}.hero h1{font-size:19px}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hero">
+      <h1>Absen QR Siswa</h1>
+      <p id="schoolInfo">Memuat data sekolah...</p>
+    </div>
+
+    <div class="card">
+      <div class="grid">
+        <div><label>Tanggal</label><input type="date" id="tanggal"></div>
+        <div><label>Sesi</label><select id="sesi"><option>Pagi</option><option>Siang</option><option>Malam</option></select></div>
+        <div><label>Guru</label><select id="guru"></select></div>
+        <div><label>Status Manual (opsional)</label><select id="manualStatus"><option value="">Otomatis</option><option>Hadir</option><option>Telat</option><option>Izin</option><option>Sakit</option></select></div>
+      </div>
+      <div class="inline-help small">
+        Halaman <b>Apps Script</b> ini dipakai sebagai cadangan yang stabil untuk <b>scan dari foto/upload QR</b> dan <b>input manual</b>. Untuk <b>live camera HP/laptop</b>, gunakan frontend hosting biasa.
+      </div>
+      <div id="hostedLinkArea" class="small" style="margin-top:8px"></div>
+    </div>
+
+    <div class="card">
+      <label>Upload Foto QR / Ambil Gambar</label>
+      <input type="file" id="imageInput" accept="image/*" capture="environment">
+      <div style="height:10px"></div>
+      <img id="preview" class="preview hidden" alt="Preview QR">
+      <canvas id="canvas" class="hidden"></canvas>
+      <div class="row" style="margin-top:12px;">
+        <button class="btn-primary" id="btnDecodeImage">Baca QR dari Foto</button>
+        <button class="btn-light" id="btnUseDecoded">Simpan Hasil QR</button>
+      </div>
+      <div id="decodedInfo" class="small" style="margin-top:8px">Belum ada QR dari gambar.</div>
+      <div id="statusBox" class="status hidden"></div>
+    </div>
+
+    <div class="card">
+      <label>Input Manual QR / NIS</label>
+      <input type="text" id="manualCode" placeholder="Tempel isi QR atau ketik NIS siswa">
+      <div style="height:10px"></div>
+      <label>Keterangan (opsional)</label>
+      <textarea id="keterangan" placeholder="Misal: datang terlambat karena hujan"></textarea>
+      <div class="row" style="margin-top:12px;"><button class="btn-success" id="btnSubmitManual">Simpan Manual</button></div>
+      <div style="margin-top:8px">
+        <span class="pill">Cadangan 1: foto QR dari HP</span>
+        <span class="pill">Cadangan 2: upload foto QR dari laptop</span>
+        <span class="pill">Cadangan 3: ketik NIS manual</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <label>Riwayat 8 scan terakhir</label>
+      <div id="recentList" class="small">Memuat...</div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+  <script>
+    let appData = null;
+    let decodedText = '';
+
+    function byId(id){ return document.getElementById(id); }
+    function safeErrorMessage(err){ if(!err) return 'Unknown error'; return err.message || String(err); }
+    function escapeHtml(text){ return String(text || '').replace(/[&<>\"]/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]); }); }
+
+    function showStatus(message, type) {
+      const box = byId('statusBox');
+      box.className = 'status ' + (type || 'warn');
+      box.textContent = message;
+      box.classList.remove('hidden');
+    }
+
+    function getPayload(qrText, source) {
+      return {
+        qrText: qrText,
+        tanggal: byId('tanggal').value,
+        sesi: byId('sesi').value,
+        guru: byId('guru').value,
+        manualStatus: byId('manualStatus').value,
+        keterangan: byId('keterangan').value,
+        userAgent: navigator.userAgent,
+        device: /Android/i.test(navigator.userAgent) ? 'Android Browser' : (/iPhone|iPad|iPod/i.test(navigator.userAgent) ? 'iPhone/iPad Browser' : 'Laptop/Desktop Browser'),
+        fromAppsScript: '1',
+        source: source || 'Apps Script'
+      };
+    }
+
+    function saveAttendance(qrText, sourceLabel) {
+      if (!byId('guru').value) {
+        showStatus('Pilih nama guru terlebih dahulu.', 'warn');
+        return;
+      }
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (!res) return showStatus('Tidak ada respons dari server.', 'err');
+          if (res.ok) {
+            showStatus(res.student.nama + ' (' + res.student.nis + ') - ' + res.status + ' - ' + res.jam + ' [' + (res.source || sourceLabel || 'Apps Script') + ']', 'ok');
+            byId('manualCode').value = '';
+            byId('keterangan').value = '';
+            decodedText = '';
+            byId('decodedInfo').textContent = 'Belum ada QR dari gambar.';
+            if (navigator.vibrate) navigator.vibrate([100, 40, 100]);
+          } else {
+            showStatus(res.message || 'Gagal menyimpan absensi.', res.duplicate ? 'warn' : 'err');
+          }
+          refreshRecent();
+        })
+        .withFailureHandler(function(err) {
+          showStatus('Error: ' + safeErrorMessage(err), 'err');
+        })
+        .saveAttendance(getPayload(qrText, sourceLabel));
+    }
+
+    function refreshRecent() {
+      google.script.run.withSuccessHandler(function(items){
+        const el = byId('recentList');
+        if (!items || !items.length) {
+          el.innerHTML = '<div class="small">Belum ada data absensi.</div>';
+          return;
+        }
+        el.innerHTML = items.map(function(x){
+          return '<div class="recent-item"><b>' + escapeHtml(x.nama) + '</b> (' + escapeHtml(x.nis) + ')<br>' +
+                 escapeHtml(x.status) + ' | ' + escapeHtml(x.sesi) + ' | ' + escapeHtml(x.guru) + ' | ' + escapeHtml(x.jam) + ' | ' + escapeHtml(x.source || '-') + '</div>';
+        }).join('');
+      }).getRecentAttendance(8);
+    }
+
+    function decodeSelectedImage() {
+      const file = byId('imageInput').files[0];
+      if (!file) {
+        showStatus('Pilih dulu file gambar QR.', 'warn');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        const img = new Image();
+        img.onload = function() {
+          const canvas = byId('canvas');
+          const ctx = canvas.getContext('2d', { willReadFrequently: true });
+          canvas.width = img.naturalWidth || img.width;
+          canvas.height = img.naturalHeight || img.height;
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'attemptBoth' });
+          byId('preview').src = evt.target.result;
+          byId('preview').classList.remove('hidden');
+          if (!code || !code.data) {
+            decodedText = '';
+            byId('decodedInfo').textContent = 'QR tidak terbaca dari gambar ini. Coba foto yang lebih jelas atau gunakan input manual.';
+            showStatus('QR pada gambar belum terbaca.', 'err');
+            return;
+          }
+          decodedText = String(code.data).trim();
+          byId('decodedInfo').innerHTML = 'QR berhasil dibaca:<br><b>' + escapeHtml(decodedText) + '</b>';
+          showStatus('QR berhasil dibaca dari foto. Klik "Simpan Hasil QR" untuk menyimpan absensi.', 'ok');
+        };
+        img.onerror = function() {
+          showStatus('Gambar tidak bisa diproses.', 'err');
+        };
+        img.src = evt.target.result;
+      };
+      reader.onerror = function() {
+        showStatus('File gambar gagal dibaca.', 'err');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function init() {
+      google.script.run
+        .withSuccessHandler(function(data){
+          appData = data || {};
+          byId('schoolInfo').textContent = (data.schoolName || 'PKBM') + (data.schoolYear ? ' • ' + data.schoolYear : '');
+          byId('tanggal').value = data.today || '';
+          byId('sesi').value = data.defaultSesi || 'Pagi';
+          const guru = byId('guru');
+          const teachers = Array.isArray(data.teachers) ? data.teachers : [];
+          if (!teachers.length) {
+            guru.innerHTML = '<option value="">Belum ada guru aktif di sheet GURU</option>';
+            showStatus('Daftar guru kosong. Isi sheet GURU dan pastikan kolom Aktif bernilai YA.', 'warn');
+          } else {
+            guru.innerHTML = '<option value="">Pilih Guru</option>' + teachers.map(function(name){
+              return '<option value="' + String(name).replace(/"/g, '&quot;') + '">' + escapeHtml(name) + '</option>';
+            }).join('');
+          }
+          const hostedArea = byId('hostedLinkArea');
+          if (data.hostedFrontendUrl) {
+            hostedArea.innerHTML = 'Live camera HP/laptop: <a href="' + data.hostedFrontendUrl + '" target="_blank">buka frontend hosting</a>';
+          } else {
+            hostedArea.innerHTML = 'Live camera HP/laptop: isi dulu <b>Hosted Frontend URL</b> di sheet PENGATURAN setelah file hosting di-upload.';
+          }
+          refreshRecent();
+        })
+        .withFailureHandler(function(err){
+          showStatus('Gagal memuat data aplikasi: ' + safeErrorMessage(err), 'err');
+        })
+        .getAppData();
+
+      byId('btnDecodeImage').addEventListener('click', decodeSelectedImage);
+      byId('btnUseDecoded').addEventListener('click', function(){
+        if (!decodedText) return showStatus('Belum ada hasil QR dari gambar.', 'warn');
+        saveAttendance(decodedText, 'Apps Script Upload Foto');
+      });
+      byId('btnSubmitManual').addEventListener('click', function(){
+        const v = byId('manualCode').value.trim();
+        if (!v) return showStatus('Isi dulu QR / NIS secara manual.', 'warn');
+        saveAttendance(v, 'Apps Script Manual');
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
