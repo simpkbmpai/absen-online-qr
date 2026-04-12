@@ -25,6 +25,7 @@ function onScanSuccess(decodedText, decodedResult) {
             "Content-Type": "application/json"
         },
         body: JSON.stringify({
+            action: "saveAttendance",
             qrText: decodedText,
             source: "GitHub Scanner"
         })
