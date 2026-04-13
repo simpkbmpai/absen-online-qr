@@ -31,14 +31,12 @@ const params =
   "&qrText=" + encodeURIComponent(decodedText) +
   "&guru=" + encodeURIComponent(document.getElementById("guru").value);
 
-fetch(url + params, { method: "GET", mode: "no-cors" })
-  .then(() => {
-    alert("Absen berhasil!");
-  })
-  .catch(error => {
-    alert("Gagal kirim data!");
-    console.error(error);
-  });
+fetch(url + params, {
+  method: "GET",
+  mode: "no-cors"
+});
+
+alert("Absen berhasil!");
 
 setTimeout(() => {
     lastScan = "";
