@@ -33,7 +33,8 @@ const params =
 
 fetch(url + params, { method: "GET", mode: "no-cors" })
   .then(() => {
-    alert("Absen berhasil!");
+    playBeep();
+showSuccessPopup("Absen berhasil!");
   })
   .catch(error => {
     alert("Gagal kirim data!");
@@ -50,6 +51,22 @@ let scanner = new Html5QrcodeScanner(
 
 scanner.render(onScanSuccess);
 </script>
-
+<div id="successPopup" style="
+  display:none;
+  position:fixed;
+  top:20px;
+  left:50%;
+  transform:translateX(-50%);
+  background:#22c55e;
+  color:white;
+  padding:14px 22px;
+  border-radius:12px;
+  font-size:18px;
+  font-weight:bold;
+  box-shadow:0 4px 12px rgba(0,0,0,0.25);
+  z-index:9999;
+">
+  ✅ Absen berhasil!
+</div>
 </body>
 </html>
