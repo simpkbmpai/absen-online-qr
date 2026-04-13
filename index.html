@@ -18,32 +18,71 @@
 <script>
 let lastScan = "";
 
+function playBeep() {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    const audioCtx = new AudioCtx();
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+
+    oscillator.type = "sine";
+    oscillator.frequency.value = 900;
+    gainNode.gain.value = 0.2;
+
+    oscillator.start();
+    oscillator.stop(audioCtx.currentTime + 0.15);
+}
+
+function showSuccessPopup(message) {
+    const popup = document.getElementById("successPopup");
+    popup.textContent = "✅ " + message;
+    popup.style.display = "block";
+
+    setTimeout(() => {
+        popup.style.display = "none";
+    }, 2000);
+}
+
 function onScanSuccess(decodedText, decodedResult) {
     if (decodedText === lastScan) return;
     lastScan = decodedText;
 
-    alert("Hasil scan: " + decodedText);
+    // alert("Hasil scan: " + decodedText);
 
     const url = "https://script.google.com/macros/s/AKfycbzuqB4V7NpFaFz9l2Av9kAx5_HISrj7xBkVh-PXcL2XoM0AQlinOtbKWJ-RLrYrBZDDhQ/exec";
 
-const params =
-  "?action=saveAttendance" +
-  "&qrText=" + encodeURIComponent(decodedText) +
-  "&guru=" + encodeURIComponent(document.getElementById("guru").value);
+    const params =
+      "?action=saveAttendance" +
+      "&qrText=" + encodeURIComponent(decodedText) +
+      "&guru=" + encodeURIComponent(document.getElementById("guru").value);
 
-fetch(url + params, { method: "GET", mode: "no-cors" })
-  .then(() => {
-    playBeep();
-showSuccessPopup("Absen berhasil!");
-  })
-  .catch(error => {
-    alert("Gagal kirim data!");
-    console.error(error);
-  });
+    fetch(url + params, { method: "GET", mode: "no-cors" })
+      .then(() => {
+        try {
+          playBeep();
+        } catch (e) {
+          console.error("Beep error:", e);
+        }
+
+        try {
+          showSuccessPopup("Absen berhasil!");
+        } catch (e) {
+          console.error("Popup error:", e);
+          alert("Absen berhasil!");
+        }
+      })
+      .catch(error => {
+        alert("Gagal kirim data!");
+        console.error(error);
+      });
+
     setTimeout(() => {
         lastScan = "";
     }, 3000);
 }
+
 let scanner = new Html5QrcodeScanner(
     "reader",
     { fps: 10, qrbox: 250 }
@@ -51,6 +90,7 @@ let scanner = new Html5QrcodeScanner(
 
 scanner.render(onScanSuccess);
 </script>
+
 <div id="successPopup" style="
   display:none;
   position:fixed;
@@ -68,5 +108,6 @@ scanner.render(onScanSuccess);
 ">
   ✅ Absen berhasil!
 </div>
+
 </body>
 </html>
