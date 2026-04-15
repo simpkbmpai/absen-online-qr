@@ -1,54 +1,246 @@
 <!DOCTYPE html>
-<html>
+<html lang="id">
 <head>
-    <title>QR Scanner Absen</title>
-    <script src="https://unpkg.com/html5-qrcode"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QR Scanner Absen</title>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+
+    h2 {
+      margin-bottom: 16px;
+    }
+
+    label {
+      font-weight: bold;
+    }
+
+    select, button {
+      padding: 8px;
+      font-size: 16px;
+    }
+
+    #reader {
+      width: 320px;
+      max-width: 100%;
+      margin-top: 16px;
+    }
+
+    #status {
+      margin-top: 12px;
+      padding: 10px;
+      border-radius: 8px;
+      display: none;
+      font-size: 14px;
+    }
+
+    .ok {
+      display: block;
+      background: #e7f6ea;
+      color: #146c2e;
+      border: 1px solid #b7e1c0;
+    }
+
+    .warn {
+      display: block;
+      background: #fff4e5;
+      color: #8a5700;
+      border: 1px solid #f2d19c;
+    }
+
+    .err {
+      display: block;
+      background: #fdecea;
+      color: #b3261e;
+      border: 1px solid #f5c2c0;
+    }
+
+    .small {
+      font-size: 13px;
+      color: #555;
+      margin-top: 8px;
+    }
+  </style>
 </head>
 <body>
 
-<h2>Scan QR untuk Absen</h2>
-<label for="guru">Pilih Guru:</label>
-<select id="guru">
-  <option value="">-- Pilih Guru --</option>
-  <option value="Ust. Ridwan Hakim">Ust. Ridwan Hakim</option>
-</select>
-<br><br>
-<div id="reader" style="width:300px;"></div>
+  <h2>Scan QR untuk Absen</h2>
 
-<script>
-let lastScan = "";
+  <label for="guru">Pilih Guru:</label>
+  <br>
+  <select id="guru">
+    <option value="">Memuat daftar guru...</option>
+  </select>
 
-function onScanSuccess(decodedText, decodedResult) {
-    if (decodedText === lastScan) return;
-    lastScan = decodedText;
+  <div id="status"></div>
+  <div class="small" id="info">Silakan pilih guru, lalu arahkan kamera ke QR siswa.</div>
 
-    alert("Hasil scan: " + decodedText);
+  <div id="reader"></div>
 
-    const url = "https://script.google.com/macros/s/AKfycbzuqB4V7NpFaFz9l2Av9kAx5_HISrj7xBkVh-PXcL2XoM0AQlinOtbKWJ-RLrYrBZDDhQ/exec";
+  <script>
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzuqB4V7NpFaFz9l2Av9kAx5_HISrj7xBkVh-PXcL2XoM0AQlinOtbKWJ-RLrYrBZDDhQ/exec";
 
-const params =
-  "?action=saveAttendance" +
-  "&qrText=" + encodeURIComponent(decodedText) +
-  "&guru=" + encodeURIComponent(document.getElementById("guru").value);
+    let lastScan = "";
+    let scannerStarted = false;
 
-fetch(url + params, {
-  method: "GET",
-  mode: "no-cors"
-});
+    function byId(id) {
+      return document.getElementById(id);
+    }
 
-alert("Absen berhasil!");
+    function showStatus(message, type) {
+      const el = byId("status");
+      el.className = "";
+      el.textContent = message;
 
-setTimeout(() => {
-    lastScan = "";
-}, 3000);
-}
-let scanner = new Html5QrcodeScanner(
-    "reader",
-    { fps: 10, qrbox: 250 }
-);
+      if (type === "ok") el.classList.add("ok");
+      else if (type === "warn") el.classList.add("warn");
+      else el.classList.add("err");
+    }
 
-scanner.render(onScanSuccess);
-</script>
+    function resetGuruOptions() {
+      const guruSelect = byId("guru");
+      guruSelect.innerHTML = "";
+
+      const opt = document.createElement("option");
+      opt.value = "";
+      opt.textContent = "-- Pilih Guru --";
+      guruSelect.appendChild(opt);
+    }
+
+    function fillGuruOptions(teachers) {
+      const guruSelect = byId("guru");
+      resetGuruOptions();
+
+      if (!Array.isArray(teachers) || teachers.length === 0) {
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = "Belum ada guru aktif di sheet";
+        guruSelect.appendChild(opt);
+        showStatus("Daftar guru kosong. Cek sheet GURU dan pastikan kolom Aktif bernilai YA.", "warn");
+        return;
+      }
+
+      teachers.forEach(function(name) {
+        const opt = document.createElement("option");
+        opt.value = String(name).trim();
+        opt.textContent = String(name).trim();
+        guruSelect.appendChild(opt);
+      });
+
+      showStatus("Daftar guru berhasil dimuat dari Google Sheet.", "ok");
+    }
+
+    function loadTeachersJsonp() {
+      resetGuruOptions();
+
+      const callbackName = "jsonpGetAppData_" + Date.now();
+
+      window[callbackName] = function(response) {
+        try {
+          if (!response || !response.ok || !response.data) {
+            showStatus("Gagal memuat data guru dari Apps Script.", "err");
+            return;
+          }
+
+          const teachers = response.data.teachers || [];
+          fillGuruOptions(teachers);
+        } finally {
+          try {
+            delete window[callbackName];
+          } catch (e) {}
+
+          const oldScript = document.getElementById(callbackName);
+          if (oldScript) oldScript.remove();
+        }
+      };
+
+      const script = document.createElement("script");
+      script.id = callbackName;
+      script.src =
+        SCRIPT_URL +
+        "?action=getAppData&callback=" + encodeURIComponent(callbackName);
+
+      script.onerror = function() {
+        showStatus("Tidak bisa mengambil daftar guru. Cek URL Apps Script atau deploy Web App.", "err");
+        try {
+          delete window[callbackName];
+        } catch (e) {}
+      };
+
+      document.body.appendChild(script);
+    }
+
+    function sendAttendance(decodedText, guru) {
+      const params =
+        "?action=saveAttendance" +
+        "&qrText=" + encodeURIComponent(decodedText) +
+        "&guru=" + encodeURIComponent(guru) +
+        "&source=" + encodeURIComponent("GitHub Live Scanner") +
+        "&fromHosted=1";
+
+      return fetch(SCRIPT_URL + params, {
+        method: "GET",
+        mode: "no-cors"
+      });
+    }
+
+    function onScanSuccess(decodedText) {
+      if (decodedText === lastScan) return;
+
+      const guru = byId("guru").value;
+      if (!guru) {
+        showStatus("Silakan pilih guru terlebih dahulu.", "warn");
+        return;
+      }
+
+      lastScan = decodedText;
+
+      showStatus("QR terbaca: " + decodedText, "ok");
+
+      sendAttendance(decodedText, guru)
+        .then(function() {
+          alert("Absen berhasil dikirim untuk guru: " + guru);
+          showStatus("Absen berhasil dikirim.", "ok");
+
+          setTimeout(function() {
+            lastScan = "";
+          }, 3000);
+        })
+        .catch(function(err) {
+          console.error(err);
+          alert("Gagal mengirim absensi.");
+          showStatus("Gagal mengirim absensi ke Apps Script.", "err");
+
+          setTimeout(function() {
+            lastScan = "";
+          }, 3000);
+        });
+    }
+
+    function startScanner() {
+      if (scannerStarted) return;
+      scannerStarted = true;
+
+      const scanner = new Html5QrcodeScanner(
+        "reader",
+        {
+          fps: 10,
+          qrbox: 250
+        }
+      );
+
+      scanner.render(onScanSuccess);
+    }
+
+    document.addEventListener("DOMContentLoaded", function() {
+      loadTeachersJsonp();
+      startScanner();
+    });
+  </script>
 
 </body>
 </html>
