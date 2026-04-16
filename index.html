@@ -140,6 +140,7 @@
       const callbackName = "jsonpGetAppData_" + Date.now();
 
       window[callbackName] = function(response) {
+        console.log("DATA MASUK:", response);
         try {
           if (!response || !response.ok || !response.data) {
             showStatus("Gagal memuat data guru dari Apps Script.", "err");
