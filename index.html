@@ -196,6 +196,8 @@
     }
 
     function sendAttendance(decodedText, guru) {
+    alert("Mode terkirim: " + modeAbsen);
+      
       const params =
         "?action=saveAttendance" +
         "&qrText=" + encodeURIComponent(decodedText) +
