@@ -78,7 +78,12 @@
   <select id="guru">
     <option value="">Memuat daftar guru...</option>
   </select>
-
+  
+  <br><br>
+  <label>Mode Absen:</label><br>
+  <button onclick="setMode('datang')">Datang</button>
+  <button onclick="setMode('pulang')">Pulang</button>
+  
   <div id="status"></div>
   <div class="small" id="info">Silakan pilih guru, lalu arahkan kamera ke QR siswa.</div>
 
@@ -89,6 +94,16 @@
 
     let lastScan = "";
     let scannerStarted = false;
+    let modeAbsen = "datang";
+    function setMode(mode) {
+    modeAbsen = mode;
+
+    if (mode === "datang") {
+    showStatus("Mode: Datang", "ok");
+    } else {
+    showStatus("Mode: Pulang", "warn");
+  }
+}
 
     function byId(id) {
       return document.getElementById(id);
@@ -185,6 +200,7 @@
         "?action=saveAttendance" +
         "&qrText=" + encodeURIComponent(decodedText) +
         "&guru=" + encodeURIComponent(guru) +
+        "&mode=" + encodeURIComponent(modeAbsen) + 
         "&source=" + encodeURIComponent("GitHub Live Scanner") +
         "&fromHosted=1";
 
