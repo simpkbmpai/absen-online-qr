@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scanner Absen Guru/Karyawan</title>
+
+  <script src="https://unpkg.com/html5-qrcode"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f9f4;
+      margin: 0;
+      padding: 20px;
+      color: #0b2b45;
+    }
+
+    .box {
+      max-width: 720px;
+      margin: 0 auto;
+      background: white;
+      border: 1px solid #cfe5d4;
+      border-radius: 18px;
+      padding: 24px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+    }
+
+    h1 {
+      margin-top: 0;
+      color: #116530;
+      font-size: 28px;
+      letter-spacing: 2px;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 15px;
+      border: none;
+      border-radius: 10px;
+      background: #075c2b;
+      color: white;
+      font-size: 18px;
+      font-weight: bold;
+      cursor: pointer;
+      margin-bottom: 12px;
+    }
+
+    .btn-secondary {
+      background: #eaf5ec;
+      color: #075c2b;
+      border: 1px solid #cfe5d4;
+    }
+
+    #reader {
+      width: 100%;
+      max-width: 520px;
+      margin: 18px auto;
+    }
+
+    .status {
+      background: #eef8ef;
+      border: 1px solid #cfe5d4;
+      border-radius: 12px;
+      padding: 16px;
+      margin-top: 14px;
+      line-height: 1.6;
+      font-size: 16px;
+    }
+
+    .manual {
+      display: flex;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    input {
+      flex: 1;
+      padding: 13px;
+      border: 1px solid #cfd8cf;
+      border-radius: 8px;
+      font-size: 16px;
+    }
+
+    .manual button {
+      padding: 13px 18px;
+      border-radius: 8px;
+      border: 1px solid #075c2b;
+      background: #075c2b;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .note {
+      margin-top: 12px;
+      color: #4b5d4b;
+      font-size: 14px;
+    }
+
+    .footer {
+      text-align: center;
+      margin-top: 18px;
+      color: #526452;
+      font-size: 14px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="box">
+    <h1>Scan QR Absen Guru/Karyawan</h1>
+
+    <button class="btn" onclick="mulaiScanner()">Mulai Scanner</button>
+    <button class="btn btn-secondary" onclick="stopScanner()">Stop Scanner</button>
+
+    <div class="manual">
+      <input id="manualQr" placeholder="Tempel kode QR manual, contoh: GURU|G001|Ustadz Contoh">
+      <button onclick="kirimManual()">Kirim</button>
+    </div>
+
+    <p class="note">
+      Arahkan kamera ke QR guru/karyawan. Scan pertama menjadi absen datang, scan kedua menjadi absen pulang.
+    </p>
+
+    <div id="reader"></div>
+
+    <div id="status" class="status">
+      Siap scan QR guru/karyawan.
+    </div>
+
+    <div class="footer">
+      PKBM Pelita Aushaf Indonesia
+    </div>
+  </div>
+
+  <script>
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzL8_OIBPRtCZGY7fO2_TO1T4Fsp-DHtFrv5eyOM5cKciH9mbWn2F7-VIV-DsGbMg2BUg/exec";
+
+    let scanner = null;
+    let sedangProses = false;
+
+    function mulaiScanner() {
+      tampilStatus("Membuka kamera...");
+
+      if (scanner) {
+        stopScanner();
+      }
+
+      scanner = new Html5Qrcode("reader");
+
+      scanner.start(
+        { facingMode: "environment" },
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 250 }
+        },
+        function(decodedText) {
+          if (sedangProses) return;
+
+          sedangProses = true;
+          kirimAbsenGuru(decodedText);
+
+          setTimeout(function() {
+            sedangProses = false;
+          }, 3500);
+        },
+        function(errorMessage) {
+          // error scan kecil tidak perlu ditampilkan
+        }
+      ).catch(function(err) {
+        tampilStatus("Gagal membuka kamera: " + err);
+      });
+    }
+
+    function stopScanner() {
+      if (scanner) {
+        scanner.stop().catch(function() {});
+        scanner = null;
+      }
+    }
+
+    function kirimManual() {
+      const kode = document.getElementById("manualQr").value.trim();
+
+      if (!kode) {
+        tampilStatus("Kode QR masih kosong.");
+        return;
+      }
+
+      kirimAbsenGuru(kode);
+    }
+
+    function kirimAbsenGuru(qrText) {
+      tampilStatus("Memproses QR:<br><b>" + aman(qrText) + "</b>");
+
+      const callbackName = "callbackGuru_" + Date.now();
+
+      window[callbackName] = function(res) {
+        try {
+          if (res && res.ok) {
+            const data = res.data || {};
+
+            tampilStatus(
+              "<b>" + aman(data.status || "Berhasil") + "</b><br>" +
+              "Nama: " + aman(data.nama || "-") + "<br>" +
+              "Jabatan: " + aman(data.jabatan || "-") + "<br>" +
+              "Unit: " + aman(data.unit || "-") + "<br>" +
+              "Tanggal: " + aman(data.tanggal || "-") + "<br>" +
+              "Jam Datang: " + aman(data.jamDatang || "-") + "<br>" +
+              "Jam Pulang: " + aman(data.jamPulang || "-") + "<br><br>" +
+              aman(data.pesan || "")
+            );
+          } else {
+            tampilStatus("Gagal: " + aman((res && res.message) || "Respon tidak dikenal"));
+          }
+        } finally {
+          delete window[callbackName];
+          if (script && script.parentNode) {
+            script.parentNode.removeChild(script);
+          }
+        }
+      };
+
+      const script = document.createElement("script");
+      script.src =
+        SCRIPT_URL +
+        "?action=absen_guru" +
+        "&qrText=" + encodeURIComponent(qrText) +
+        "&callback=" + callbackName;
+
+      document.body.appendChild(script);
+    }
+
+    function tampilStatus(pesan) {
+      document.getElementById("status").innerHTML = pesan;
+    }
+
+    function aman(teks) {
+      return String(teks || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+  </script>
+</body>
+</html>
